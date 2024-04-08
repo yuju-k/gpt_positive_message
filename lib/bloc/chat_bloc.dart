@@ -1,32 +1,24 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 abstract class ChatRoomEvent {
-  final String friendUID;
   final String friendEmail;
-  ChatRoomEvent(this.friendUID, this.friendEmail);
+  ChatRoomEvent(this.friendEmail);
 }
 
 class CheckChatRoomExist extends ChatRoomEvent {
-  CheckChatRoomExist(
-    String friendUID,
-    String friendEmail,
-  ) : super(friendUID, friendEmail);
+  CheckChatRoomExist(String friendEmail) : super(friendEmail);
 }
 
 class LoadChatRoom extends ChatRoomEvent {
-  LoadChatRoom(
-    String friendUID,
-    String friendEmail,
-  ) : super(friendUID, friendEmail);
+  final String roomId;
+  LoadChatRoom(this.roomId, String friendEmail) : super(friendEmail);
 }
 
 class CreateChatRoom extends ChatRoomEvent {
-  CreateChatRoom(
-    String friendUID,
-    String friendEmail,
-  ) : super(friendUID, friendEmail);
+  CreateChatRoom(String friendEmail) : super(friendEmail);
 }
 
 abstract class ChatRoomState {}
@@ -55,8 +47,9 @@ class ChatRoomCreated extends ChatRoomState {
 }
 
 class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
   final DatabaseReference databaseRef = FirebaseDatabase.instance.ref();
-  final String userId = FirebaseAuth.instance.currentUser!.uid;
+  final String userEmail = FirebaseAuth.instance.currentUser!.email!;
 
   ChatRoomBloc() : super(ChatRoomInitial()) {
     on<CheckChatRoomExist>(_onCheckChatRoomExist);
@@ -68,35 +61,32 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       CheckChatRoomExist event, Emitter<ChatRoomState> emit) async {
     emit(ChatRoomLoading());
 
-    // Query chat rooms by friend's UID, and my uid
-    Query userRoomsRef = databaseRef
-        .child('chat_rooms')
-        .orderByChild('participants/$userId')
-        .equalTo(true);
+    DocumentSnapshot currentUserChatRoomsSnapshot =
+        await firestore.collection('user_chat_rooms').doc(userEmail).get();
 
-    DatabaseEvent userRoomsEvent = await userRoomsRef.once();
+    DocumentSnapshot friendChatRoomsSnapshot = await firestore
+        .collection('user_chat_rooms')
+        .doc(event.friendEmail)
+        .get();
 
-    if (userRoomsEvent.snapshot.exists) {
-      bool roomFound = false;
-      String roomId = '';
+    String? chatRoomId;
+    if (currentUserChatRoomsSnapshot.exists && friendChatRoomsSnapshot.exists) {
+      Map<String, dynamic> currentUserChatRooms =
+          currentUserChatRoomsSnapshot.data() as Map<String, dynamic>;
+      Map<String, dynamic> friendChatRooms =
+          friendChatRoomsSnapshot.data() as Map<String, dynamic>;
 
-      for (var child in userRoomsEvent.snapshot.children) {
-        if (child.child('participants/${event.friendUID}').exists) {
-          roomFound = true;
-          roomId = child.key!;
+      for (String roomId in currentUserChatRooms.keys) {
+        if (friendChatRooms.containsKey(roomId)) {
+          chatRoomId = roomId;
           break;
         }
       }
+    }
 
-      if (roomFound) {
-        // Chat room with both users exists
-        emit(ChatRoomExist(roomId));
-      } else {
-        // Chat room does not exist with both users
-        emit(ChatRoomNotExist());
-      }
+    if (chatRoomId != null) {
+      emit(ChatRoomExist(chatRoomId));
     } else {
-      // No chat rooms exist for the current user
       emit(ChatRoomNotExist());
     }
   }
@@ -105,12 +95,9 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       LoadChatRoom event, Emitter<ChatRoomState> emit) async {
     emit(ChatRoomLoading());
 
-    // Load chat room messages
-    final messagesRef =
-        databaseRef.child('chat_rooms/${event.friendUID}/messages');
+    final messagesRef = databaseRef.child('messages/${event.roomId}');
     final snapshot = await messagesRef.once();
     if (snapshot.snapshot.exists) {
-      // Extract messages
       List<Map<String, dynamic>> messages = [];
       for (var message in snapshot.snapshot.children) {
         messages.add(Map<String, dynamic>.from(message.value as Map));
@@ -125,26 +112,24 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       CreateChatRoom event, Emitter<ChatRoomState> emit) async {
     emit(ChatRoomLoading());
 
-    // Create a new chat room entry
     DatabaseReference newChatRoomRef = databaseRef.child('chat_rooms').push();
-
-    // Setting up participants for the chat room
-    Map<String, bool> participants = {
-      userId: true,
-      event.friendUID: true,
-    };
-
-    Map<String, String> emails = {
-      userId: FirebaseAuth.instance.currentUser!.email!,
-      event.friendUID: event.friendEmail,
-    };
+    String chatRoomId = newChatRoomRef.key!;
 
     await newChatRoomRef.set({
-      'participants': participants,
-      'email': emails,
+      'userEmails': [userEmail, event.friendEmail],
+      'last_message': '',
+      'last_message_timestamp': ServerValue.timestamp,
+      'create_chat_room_timestamp': ServerValue.timestamp,
     });
 
-    // Emitting the state with the new room ID
-    emit(ChatRoomCreated(newChatRoomRef.key!));
+    await firestore.collection('user_chat_rooms').doc(userEmail).set({
+      chatRoomId: true,
+    }, SetOptions(merge: true));
+
+    await firestore.collection('user_chat_rooms').doc(event.friendEmail).set({
+      chatRoomId: true,
+    }, SetOptions(merge: true));
+
+    emit(ChatRoomCreated(chatRoomId));
   }
 }

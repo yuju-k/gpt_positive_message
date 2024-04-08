@@ -73,7 +73,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final chatRoomBloc = context.read<ChatRoomBloc>();
 
     // Checking if chat room exists with friend's email
-    chatRoomBloc.add(CheckChatRoomExist(widget.uid, widget.email));
+    chatRoomBloc.add(CheckChatRoomExist(widget.uid));
 
     // 텍스트 컨트롤러 값 변경되면 _isRecommendMessageWidgetVisible를 false로 변경
     _textEditingController.addListener(() {
@@ -153,9 +153,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               }
               if (state is ChatRoomNotExist) {
                 // Trigger the creation of a new chat room
-                context
-                    .read<ChatRoomBloc>()
-                    .add(CreateChatRoom(widget.uid, widget.email));
+                context.read<ChatRoomBloc>().add(CreateChatRoom(widget.uid));
               }
               if (state is ChatRoomLoaded) {
                 scrollToBottomWithoutAnimation();

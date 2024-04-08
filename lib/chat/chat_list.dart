@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart' as rtdb;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:chat_tunify/chat/chat.dart';
+// import 'package:chat_tunify/chat/chat.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -15,10 +15,10 @@ class _ChatListPageState extends State<ChatListPage> {
   final rtdb.DatabaseReference databaseRef =
       rtdb.FirebaseDatabase.instance.ref();
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  final String userId = FirebaseAuth.instance.currentUser!.uid;
+  final String userEmail = FirebaseAuth.instance.currentUser!.email!;
   List<Map<String, dynamic>> chatList = [];
 
-  bool isLoading = false; // Add a new state variable for loading status
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -29,85 +29,82 @@ class _ChatListPageState extends State<ChatListPage> {
   void loadChatList() async {
     try {
       setState(() {
-        isLoading = true; // Set loading to true when the fetch starts
+        isLoading = true;
       });
 
-      // Query chat rooms where the current user is a participant
-      rtdb.Query chatRoomsQuery = databaseRef
-          .child('chat_rooms')
-          .orderByChild('participants/$userId')
-          .equalTo(true);
+      // Cloud Firestore에서 현재 사용자의 채팅방 목록을 가져옵니다.
+      DocumentSnapshot userChatRoomsSnapshot =
+          await firestore.collection('user_chat_rooms').doc(userEmail).get();
 
-      rtdb.DatabaseEvent event = await chatRoomsQuery.once();
+      if (userChatRoomsSnapshot.exists) {
+        Map<String, dynamic> userChatRooms =
+            userChatRoomsSnapshot.data() as Map<String, dynamic>;
 
-      List<Map<String, dynamic>> loadedChatList = [];
-      for (var room in event.snapshot.children) {
-        try {
-          // Get chat room data as a Map
-          Map<String, dynamic> chatRoomData =
-              Map<String, dynamic>.from(room.value as Map);
+        List<Map<String, dynamic>> loadedChatList = [];
+        for (String chatRoomId in userChatRooms.keys) {
+          //key값을 사용해서 채팅방 정보를 가져옴
+          if (userChatRooms[chatRoomId] == true) {
+            //chatRoomId가 true인 경우에만 채팅방 정보를 가져옴
+            try {
+              // 채팅방 정보 가지고 오기, chat_rooms => chatRoomId (realtime database)
+              rtdb.DataSnapshot chatRoomSnapshot = await databaseRef
+                  .child('chat_rooms')
+                  .child(chatRoomId)
+                  .once()
+                  .then((value) => value.snapshot);
 
-          // 현재 사용자의 UID를 가져옵니다.
+              Map<String, dynamic> chatRoomDetails =
+                  Map<String, dynamic>.from(chatRoomSnapshot.value as Map);
 
-          // 현재 사용자를 제외한 다른 참가자의 이메일을 찾습니다.
-          String? friendEmail;
-          for (String email in chatRoomData['email'].values) {
-            if (email != FirebaseAuth.instance.currentUser!.email) {
-              friendEmail = email;
-              break; // 다른 참가자를 찾으면 반복문을 중단합니다.
+              // 현재 사용자를 제외한 다른 참가자의 이메일을 찾습니다.
+              String friendEmail = chatRoomDetails['userEmails']
+                  .firstWhere((email) => email != userEmail, orElse: () => '');
+
+              if (friendEmail.isEmpty) {
+                continue;
+              }
+
+              // Firestore에서 친구의 프로필을 가져옵니다.
+              var friendProfile = await firestore
+                  .collection('user_profile')
+                  .where('email', isEqualTo: friendEmail)
+                  .get();
+
+              if (friendProfile.docs.isNotEmpty) {
+                var friendData = friendProfile.docs.first.data();
+                String friendName = friendData['name'] ?? 'Unknown';
+                String friendImageUrl = friendData['imageUrl'] ?? '';
+
+                // 채팅방 정보를 loadedChatList에 추가합니다.
+                loadedChatList.add({
+                  'roomId': chatRoomId,
+                  'roomName': friendName,
+                  'friendEmail': friendEmail,
+                  'friendImageUrl': friendImageUrl,
+                  'lastMessage': chatRoomDetails['last_message'] ?? '',
+                });
+              }
+            } catch (e) {
+              // Handle exceptions for each chat room processing
+              print('Error processing a chat room: $e');
             }
           }
-
-          if (friendEmail == null) {
-            continue; // 친구 이메일을 찾지 못한 경우, 다음 채팅방으로 넘어갑니다.
-          }
-
-          // Initialize lastMessage with a default value
-          String lastMessage = '';
-          if (chatRoomData['last_message'] != null) {
-            Map<String, dynamic> lastMessageData =
-                Map<String, dynamic>.from(chatRoomData['last_message'] as Map);
-            lastMessage = lastMessageData['last_message'] ?? '';
-          }
-
-          // Firestore에서 친구의 이메일로 사용자 프로필을 조회합니다.
-          var userProfiles = await firestore
-              .collection('user_profile')
-              .where('email', isEqualTo: friendEmail)
-              .get();
-
-          if (userProfiles.docs.isNotEmpty) {
-            var userProfile = userProfiles.docs.first.data();
-            String friendName = userProfile['name'] ?? 'Unknown';
-            String friendImageUrl = userProfile['imageUrl'] ?? '';
-            String friendUid = userProfile['uid'] ?? '';
-
-            // Add to the list of chat rooms with the friend's name, profile image URL, and last message
-            loadedChatList.add({
-              'roomId': room.key,
-              'roomName': friendName,
-              'friendEmail': friendEmail,
-              'friendImageUrl': friendImageUrl,
-              'friendUID': friendUid,
-              'lastMessage': lastMessage,
-            });
-          }
-        } catch (e) {
-          // Handle exceptions for each chat room processing
-          //print('Error processing a chat room: $e');
         }
-      }
 
-      setState(() {
-        chatList =
-            loadedChatList; // Update the chatList with the loadedChatList
-        isLoading = false; // Set loading to false after processing is complete
-      });
+        setState(() {
+          chatList = loadedChatList;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } catch (e) {
       // Handle exceptions for the entire chat list loading process
-      //print('Error loading chat list: $e');
+      print('Error loading chat list: $e');
       setState(() {
-        isLoading = false; // Ensure loading is set to false in case of an error
+        isLoading = false;
       });
     }
   }
@@ -137,28 +134,22 @@ class _ChatListPageState extends State<ChatListPage> {
                                 'assets/images/default_profile.png'),
                       ),
                       title: Text(chatRoom['roomName'] ?? 'No name'),
-                      subtitle:
-                          //chatRoom['lastMessage'] 를 20자로 자르고 ...을 붙여줌
-                          RichText(
-                        text: TextSpan(
-                          text: chatRoom['lastMessage'].length > 20
-                              ? chatRoom['lastMessage'].substring(0, 20) + '...'
-                              : chatRoom['lastMessage'],
-                          style: const TextStyle(color: Colors.black),
-                        ),
+                      subtitle: Text(
+                        chatRoom['lastMessage'].length > 20
+                            ? '${chatRoom['lastMessage'].substring(0, 20)}...'
+                            : chatRoom['lastMessage'],
                       ),
-                      //Text(chatRoom['lastMessage']),
                       onTap: () {
                         // 채팅방으로 이동
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatRoomPage(
-                                name: chatRoom['roomName'],
-                                email: chatRoom['friendEmail'],
-                                uid: chatRoom['friendUID'],
-                              ),
-                            ));
+                        // Navigator.push(
+                        //   context,
+                        //   MaterialPageRoute(
+                        //     builder: (context) => ChatRoomPage(
+                        //       name: chatRoom['roomName'],
+                        //       email: chatRoom['friendEmail'],
+                        //     ),
+                        //   ),
+                        // );
                       },
                     );
                   },

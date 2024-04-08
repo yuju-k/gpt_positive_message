@@ -59,7 +59,6 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  // Use List<Map<String, dynamic>> to match the ContactsLoaded state
   List<Map<String, dynamic>> allContacts = [];
 
   ContactsBloc({
@@ -140,8 +139,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
       DocumentSnapshot friendsSnapshot =
           await _firestore.collection('friends').doc('${user.email}').get();
 
-      // allContacts.clear();
-      List<Map<String, dynamic>> allContacts = [];
+      List<Map<String, dynamic>> loadedContacts = [];
 
       if (friendsSnapshot.exists) {
         Map<String, dynamic> data =
@@ -158,7 +156,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
           if (friendProfileDoc.exists) {
             Map<String, dynamic> friendData =
                 friendProfileDoc.data() as Map<String, dynamic>;
-            allContacts.add({
+            loadedContacts.add({
               'name': friendData['name'],
               'email': friendData['email'],
               'imageUrl': friendData['imageUrl'],
@@ -169,6 +167,7 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         }
       }
 
+      allContacts = loadedContacts;
       emit(ContactsLoaded(contacts: allContacts));
     } catch (e) {
       emit(ContactsFailure(error: e.toString()));
@@ -181,7 +180,6 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
       emit(ContactsLoaded(contacts: allContacts));
     } else {
       final searchResults = allContacts.where((contact) {
-        // Safely handle null values
         final nameLower = (contact['name'] as String? ?? '').toLowerCase();
         final queryLower = event.query.toLowerCase();
         return nameLower.contains(queryLower);
