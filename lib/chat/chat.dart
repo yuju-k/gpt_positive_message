@@ -15,8 +15,15 @@ class ChatRoomPage extends StatefulWidget {
   final String email;
   final String name;
   final String uid;
-  const ChatRoomPage(
-      {super.key, required this.name, required this.email, required this.uid});
+  final String roomId;
+
+  const ChatRoomPage({
+    super.key,
+    required this.name,
+    required this.email,
+    required this.uid,
+    required this.roomId,
+  });
 
   @override
   State<ChatRoomPage> createState() => _ChatRoomPageState();

@@ -1,8 +1,8 @@
+import 'package:chat_tunify/chat/chat_room_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:chat_tunify/bloc/contacts_bloc.dart';
 import 'package:chat_tunify/contacts/add_friend.dart';
-import 'package:chat_tunify/chat/chat.dart';
 
 class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
@@ -184,16 +184,7 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   void _navigateToChatRoom(Map<String, dynamic> contact) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatRoomPage(
-          name: contact['name'],
-          email: contact['email'],
-          uid: contact['uid'],
-        ),
-      ),
-    );
+    ChatRoomHandler.handleChatRoom(context, contact);
   }
 
   void _showSuccessSnackBar(String message) {

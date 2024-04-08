@@ -21,6 +21,7 @@ class ChatRoomHandler {
               name: contact['name'],
               email: contact['email'],
               uid: contact['uid'],
+              roomId: state.roomId,
             ),
           ),
         );
@@ -36,6 +37,7 @@ class ChatRoomHandler {
               name: contact['name'],
               email: contact['email'],
               uid: contact['uid'],
+              roomId: state.roomId,
             ),
           ),
         );
