@@ -13,34 +13,38 @@ class ChatRoomHandler {
 
     await for (ChatRoomState state in chatRoomBloc.stream) {
       if (state is ChatRoomExist) {
+        print('ChatRoomExist');
         // ChatRoomPage로 이동
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatRoomPage(
-              name: contact['name'],
-              email: contact['email'],
-              uid: contact['uid'],
-              roomId: state.roomId,
-            ),
-          ),
-        );
+        // Navigator.push(
+        //   context,
+        //   MaterialPageRoute(
+        //     builder: (context) => ChatRoomPage(
+        //       name: contact['name'],
+        //       email: contact['email'],
+        //       uid: contact['uid'],
+        //       roomId: state.roomId,
+        //     ),
+        //   ),
+        // );
         break;
       } else if (state is ChatRoomNotExist) {
+        //친구랑 채팅방이 없는 경우
         chatRoomBloc.add(CreateChatRoom(friendEmail));
       } else if (state is ChatRoomCreated) {
+        print('ChatRoomCreated Success');
+        //채팅방 생성 성공
         // ChatRoomPage로 이동
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatRoomPage(
-              name: contact['name'],
-              email: contact['email'],
-              uid: contact['uid'],
-              roomId: state.roomId,
-            ),
-          ),
-        );
+        // Navigator.push(
+        //   context,
+        //   MaterialPageRoute(
+        //     builder: (context) => ChatRoomPage(
+        //       name: contact['name'],
+        //       email: contact['email'],
+        //       uid: contact['uid'],
+        //       roomId: state.roomId,
+        //     ),
+        //   ),
+        // );
         break;
       }
     }

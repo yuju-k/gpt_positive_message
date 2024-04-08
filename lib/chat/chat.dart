@@ -11,7 +11,6 @@ import 'package:chat_tunify/bloc/chat_action_log_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
   //const ChatRoomPage({super.key});
-  //email을 인자로 받아서 채팅방을 생성한다.
   final String email;
   final String name;
   final String uid;
