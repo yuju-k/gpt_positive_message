@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chat_tunify/chat/message_class.dart';
 import 'package:chat_tunify/bloc/message_receive_bloc.dart';
 import 'package:chat_tunify/bloc/chat_action_log_bloc.dart';
+import 'package:chat_tunify/chat/widgets/mode_on_off_widget.dart';
 
 class ChatRoomPage extends StatefulWidget {
   //const ChatRoomPage({super.key});
@@ -110,16 +111,30 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return Scaffold(
       appBar: AppBar(
         title: InkWell(
-            onLongPress: () {
-              //modeOnOff(); 위젯을 모달로 열기
-              showModalBottomSheet(
-                context: context,
-                builder: (BuildContext context) {
-                  return modeOnOff(); // No callbacks needed here
-                },
-              );
-            },
-            child: Text(widget.name)),
+          onLongPress: () {
+            //modeOnOff(); 위젯을 모달로 열기
+            showModalBottomSheet(
+              context: context,
+              builder: (BuildContext context) {
+                return ModeOnOffWidget(
+                  originalMessageCheckMode: originalMessageCheckMode,
+                  isConvertMessageCheckMode: isConvertMessageCheckMode,
+                  onOriginalMessageCheckModeChanged: (value) {
+                    setState(() {
+                      originalMessageCheckMode = value;
+                    });
+                  },
+                  onConvertMessageCheckModeChanged: (value) {
+                    setState(() {
+                      isConvertMessageCheckMode = value;
+                    });
+                  },
+                );
+              },
+            );
+          },
+          child: Text(widget.name),
+        ),
         centerTitle: false,
       ),
       body: MultiBlocListener(
@@ -215,55 +230,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         ],
         child: totalWidet(),
       ),
-    );
-  }
-
-  Widget modeOnOff() {
-    // No changes needed to your method signature
-    return StatefulBuilder(
-      builder: (BuildContext context, StateSetter setModalState) {
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('원본 메시지 확인'),
-                Switch(
-                  value: originalMessageCheckMode,
-                  onChanged: (value) {
-                    setModalState(() {
-                      originalMessageCheckMode = value;
-                    });
-                    // You can still call the main setState if you need to update the main page
-                    setState(() {});
-                  },
-                  activeTrackColor: Colors.lightGreenAccent,
-                  activeColor: Colors.green,
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('변환된 메시지 확인'),
-                Switch(
-                  value: isConvertMessageCheckMode,
-                  onChanged: (value) {
-                    setModalState(() {
-                      isConvertMessageCheckMode = value;
-                    });
-                    // Same here for the main page update if necessary
-                    setState(() {});
-                  },
-                  activeTrackColor: Colors.lightGreenAccent,
-                  activeColor: Colors.green,
-                ),
-              ],
-            ),
-          ],
-        );
-      },
     );
   }
 

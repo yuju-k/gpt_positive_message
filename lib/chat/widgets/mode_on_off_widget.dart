@@ -15,10 +15,10 @@ class ModeOnOffWidget extends StatefulWidget {
   });
 
   @override
-  _ModeOnOffWidgetState createState() => _ModeOnOffWidgetState();
+  ModeOnOffWidgetState createState() => ModeOnOffWidgetState();
 }
 
-class _ModeOnOffWidgetState extends State<ModeOnOffWidget> {
+class ModeOnOffWidgetState extends State<ModeOnOffWidget> {
   late bool _originalMessageCheckMode;
   late bool _isConvertMessageCheckMode;
 
@@ -31,6 +31,50 @@ class _ModeOnOffWidgetState extends State<ModeOnOffWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // ... (모드 온오프 위젯 구현 생략)
+    return StatefulBuilder(
+      builder: (BuildContext context, StateSetter setModalState) {
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('원본 메시지 확인'),
+                Switch(
+                  value: _originalMessageCheckMode,
+                  onChanged: (value) {
+                    setModalState(() {
+                      _originalMessageCheckMode = value;
+                    });
+                    // You can still call the main setState if you need to update the main page
+                    setState(() {});
+                  },
+                  activeTrackColor: Colors.lightGreenAccent,
+                  activeColor: Colors.green,
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('변환된 메시지 확인'),
+                Switch(
+                  value: _isConvertMessageCheckMode,
+                  onChanged: (value) {
+                    setModalState(() {
+                      _isConvertMessageCheckMode = value;
+                    });
+                    // Same here for the main page update if necessary
+                    setState(() {});
+                  },
+                  activeTrackColor: Colors.lightGreenAccent,
+                  activeColor: Colors.green,
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 }
