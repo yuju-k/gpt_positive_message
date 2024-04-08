@@ -84,29 +84,42 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
         throw Exception('You cannot add yourself as a friend');
       }
 
-      DocumentSnapshot friendProfileDoc =
-          await _firestore.doc('user_profile/${event.userEmail}').get();
+      DocumentSnapshot friendProfileDoc = await _firestore
+          .collection('user_profile')
+          .doc(event.userEmail)
+          .get();
 
-      if (friendProfileDoc.exists) {
-        Map<String, dynamic> friendData =
-            friendProfileDoc.data()! as Map<String, dynamic>;
-        allContacts.add({
-          'name': friendData['name'],
-          'email': friendData['email'],
-          'imageUrl': friendData['imageUrl'],
-          'statusMessage': friendData['statusMessage'],
-        });
+      if (!friendProfileDoc.exists) {
+        throw Exception('User not found');
+      }
 
-        // Add friend to user's friends collection
-        await _firestore
-            .collection('user_profile')
-            .doc('${user.email}')
-            .collection('friends')
-            .add({
-          'profile_ref': 'user_profile/${event.userEmail}',
+      // Get the current user's friends document
+      DocumentReference userFriendsRef =
+          _firestore.collection('friends').doc(user.email);
+      DocumentSnapshot userFriendsSnapshot = await userFriendsRef.get();
+
+      if (!userFriendsSnapshot.exists) {
+        // If the friends document doesn't exist, create it with the new friend's email
+        await userFriendsRef.set({
+          'email': [event.userEmail],
         });
       } else {
-        throw Exception('User not found');
+        // If the friends document exists, update it with the new friend's email
+        await _firestore.runTransaction((transaction) async {
+          DocumentSnapshot freshSnap = await transaction.get(userFriendsRef);
+          if (!freshSnap.exists) {
+            throw Exception(
+                "User's friends document does not exist in the database");
+          }
+          List<dynamic> currentFriends =
+              (freshSnap.data() as Map<String, dynamic>)['email'];
+          if (currentFriends.contains(event.userEmail)) {
+            throw Exception('This user is already your friend');
+          }
+          transaction.update(userFriendsRef, {
+            'email': FieldValue.arrayUnion([event.userEmail]),
+          });
+        });
       }
 
       emit(AddUserSuccess(event.userEmail));
@@ -124,26 +137,27 @@ class ContactsBloc extends Bloc<ContactsEvent, ContactsState> {
       var user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
-      QuerySnapshot friendsSnapshot = await _firestore
-          .collection('user_profile')
-          .doc('${user.email}')
-          .collection('friends')
-          .get();
+      DocumentSnapshot friendsSnapshot =
+          await _firestore.collection('friends').doc('${user.email}').get();
 
-      //allContacts.clear();
-      allContacts = [];
+      // allContacts.clear();
+      List<Map<String, dynamic>> allContacts = [];
 
-      for (var doc in friendsSnapshot.docs) {
-        var data = doc.data();
-        if (data is Map<String, dynamic>) {
-          // Now that we have a Map, we can safely use the [] operator.
-          String profileRef = data['profile_ref'] as String;
-          DocumentSnapshot friendProfileDoc =
-              await _firestore.doc(profileRef).get();
+      if (friendsSnapshot.exists) {
+        Map<String, dynamic> data =
+            friendsSnapshot.data() as Map<String, dynamic>;
+        List<dynamic> friendsEmails =
+            data['email']; // Assuming 'email' is a List.
+
+        for (String friendEmail in friendsEmails) {
+          DocumentSnapshot friendProfileDoc = await _firestore
+              .collection('user_profile')
+              .doc(friendEmail)
+              .get();
 
           if (friendProfileDoc.exists) {
             Map<String, dynamic> friendData =
-                friendProfileDoc.data()! as Map<String, dynamic>;
+                friendProfileDoc.data() as Map<String, dynamic>;
             allContacts.add({
               'name': friendData['name'],
               'email': friendData['email'],
